@@ -1,0 +1,1119 @@
+<!--
+Authors: Erica Moody, Amy Leung, Tom Smith, Katherine Landesman
+Description: Web mapping final project: Devastation in Aleppo
+Date: Spring 2017
+-->
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<title>Devastation in Aleppo</title>
+		<style type="text/css">
+			 html {height: 100%}
+			 body {height: 100%; width: 100%}
+			 #map_canvas {height: 100%; width: 57.5%; padding: 0%; margin: 0%} <!-- use % so that map will adapt to different devices-->
+			#button1{}
+			#toggle_layers {
+				position: absolute;
+				top: 0%;
+				right: 41%;
+				width: 13%;
+				height: 10%;
+				z-index: 5;
+				background: rgba(255,255,255);
+				padding: 4px;
+				text-align: center;
+				font-family: 'Calibri';
+				line-height: 26px;
+				padding-left: 4px;
+			}
+			#toggle_heatmap {
+				position: absolute;
+				top: 0%;
+				right: 52%;
+				width: 13%;
+				height: 10%;
+				z-index: 5;
+				background: rgba(255,255,255);
+				padding: 4px;
+				text-align: center;
+				font-family: 'Calibri';
+				line-height: 26px;
+				padding-left: 4px;
+			}
+			#toggle_damagesites {
+				position: absolute;
+				top: 0%;
+				right: 63%;
+				width: 13%;
+				height: 10%;
+				z-index: 5;
+				background: rgba(255,255,255);
+				padding: 4px;
+				text-align: center;
+				font-family: 'Calibri';
+				line-height: 26px;
+				padding-left: 4px;
+			}
+			#prcntDamage_legend {
+				position: absolute;
+				left: 7.5%;
+				top: 95%;
+				width: 40%;
+				height: 10%;
+				z-index: 5;
+				background: #ffffff;
+				padding: 0%;
+				text-align: center;
+				font-family: 'Calibri';
+				line-height: 15%;
+				padding-left: 5%;
+			}
+			#project_info {
+				position: absolute;
+				top: 75px;
+				left: 20px;
+				width: 300px;
+				height: 420px;
+				z-index: 5;
+				background: white;
+				border: solid;
+				border-width: 1px;
+				border-color: #d3d3d3;
+				background: rgba(255,255,255,0.90);
+				padding: 10px;
+				font-family: 'Calibri';
+				padding-left: 10px;
+			}
+			#myChart {
+				position: absolute;
+				top: 1%;
+				right: 0.25%;
+				width: 41.5%;
+				height: 100%;
+				padding: 0%;
+				margin: 0%;
+			}
+			.zc-ref {
+			  display: none;
+			}
+		</style>
+		<script type="text/javascript" src = "https://maps.googleapis.com/maps/api/js?v=3&sensor=true"> <!-- Reference Google Maps API-->
+		</script>
+		<script type = "text/javascript">
+		//Define global variables
+		var map;
+		var aleppo = new google.maps.LatLng(36.205860, 37.139314);
+		var currentLyr = null;
+		var markersArray = []; //Create empty array for markers
+		//neighborhood boundary layer
+		var neighborhoodKML = 'https://sites.google.com/site/aleppoheatmap/neighborhoods/aleppo_neighborhoods.kmz';
+		var neighborhoodLayer = new google.maps.KmlLayer({url:  neighborhoodKML, preserveViewport: true, suppressInfoWindows: false});
+		//percent damage by neighborhood:2015
+		var prcntDamage2015KML = 'https://sites.google.com/site/aleppoheatmap/2016/2015prcntdamage.kml';
+		var prcntDamage2015Layer = new google.maps.KmlLayer({url:  prcntDamage2015KML, preserveViewport: true, suppressInfoWindows: false});
+		//percent damage by neighborhood:2016
+		var prcntDamage2016KML = 'https://sites.google.com/site/aleppoheatmap/2016/2016prcntdamage.kml';
+		var prcntDamage2016Layer = new google.maps.KmlLayer({url:  prcntDamage2016KML, preserveViewport: true, suppressInfoWindows: false});
+		//Damage heatmaps by year from kmls uploaded to fusion tables
+		var heatmap2016 = new google.maps.FusionTablesLayer({
+				  map: map,
+				  heatmap: { enabled:  true},
+				  query: {
+					select: "col2",
+					from: "15PrYN_Pxt-MF-BK_-l8gnyd1g5R9FZCQQjloQGVB",
+					where: ""
+				  },
+				});
+		var heatmap2015 = new google.maps.FusionTablesLayer({
+				  map: map,
+				  heatmap: { enabled:  true},
+				  query: {
+					select: "col2",
+					from: "1j-hQLjkqTSbGRfAdFmJ7HTNyBW7Gw_4LlA6jQjD2",
+				  	where: ""
+				  },
+				});
+		var heatmap2014 = new google.maps.FusionTablesLayer({
+				  map: map,
+				  heatmap: { enabled:  true},
+				  query: {
+					select: "col2",
+					from: "1p3vVfUZcTrznWUuv4fUz8AYY_hJKT3hiS7s0rBi_",
+				  	where: ""
+				  },
+				});
+		//Damage sites by year from kmls uploaded to fusion tables
+		var damageSites2016 = new google.maps.FusionTablesLayer({
+				map: map,
+				heatmap: { enabled:  false},
+				query: {
+					select: "col2",
+					from: "13zmJ6YkUo3lijCemln-a9JyKktDHD5SHQwoTRK8D",
+					where:""
+				  },
+				//styles: [{
+					//markerOptions: {
+						//iconName: "measle_brown",
+					//},
+				//}]
+			});
+		var damageSites2015 = new google.maps.FusionTablesLayer({
+				  map: map,
+				  heatmap: { enabled:  false},
+				  query: {
+					select: "col2",
+					from: "1yNpcvmK6kNs9uIDMzRtL1bV0BRyS34jIIdupQ4XZ",
+				  	where: ""
+				  },
+				   options: {
+					styleId: 2,
+					templateId: 2,
+					}
+				//styles: [{
+					//markerOptions: {
+						//iconName: "measle_grey",
+					//},
+				//}]
+			});
+		var damageSites2014 = new google.maps.FusionTablesLayer({
+				  map: map,
+				  heatmap: { enabled:  false},
+				  query: {
+					select: "col2",
+					from: "1ec7TPoTxgKAbSMExG6Er2pHKnYxETQsIPkKWAP2y",
+				  	where: ""
+				  },
+				   options: {
+					styleId: 2,
+					templateId: 3,
+					}
+				//styles: [{
+					//markerOptions: {
+						//iconName: "measle_white",
+					//},
+				//}]
+			});
+		//Set custom map style
+		var styles =
+[
+    {
+        "featureType": "administrative",
+        "elementType": "geometry",
+        "stylers": [
+            {
+                "saturation": "2"
+            },
+            {
+                "visibility": "simplified"
+            }
+        ]
+    },
+    {
+        "featureType": "administrative",
+        "elementType": "labels",
+        "stylers": [
+            {
+                "saturation": "-28"
+            },
+            {
+                "lightness": "-10"
+            },
+            {
+                "visibility": "on"
+            }
+        ]
+    },
+    {
+        "featureType": "administrative",
+        "elementType": "labels.text.fill",
+        "stylers": [
+            {
+                "color": "#444444"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape",
+        "elementType": "all",
+        "stylers": [
+            {
+                "color": "#f2f2f2"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape",
+        "elementType": "geometry.fill",
+        "stylers": [
+            {
+                "saturation": "-1"
+            },
+            {
+                "lightness": "-12"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape.natural",
+        "elementType": "labels.text",
+        "stylers": [
+            {
+                "lightness": "-31"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape.natural",
+        "elementType": "labels.text.fill",
+        "stylers": [
+            {
+                "lightness": "-74"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape.natural",
+        "elementType": "labels.text.stroke",
+        "stylers": [
+            {
+                "lightness": "65"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape.natural.landcover",
+        "elementType": "geometry",
+        "stylers": [
+            {
+                "lightness": "-15"
+            }
+        ]
+    },
+    {
+        "featureType": "landscape.natural.landcover",
+        "elementType": "geometry.fill",
+        "stylers": [
+            {
+                "lightness": "0"
+            }
+        ]
+    },
+    {
+        "featureType": "poi",
+        "elementType": "all",
+        "stylers": [
+            {
+                "visibility": "off"
+            }
+        ]
+    },
+    {
+        "featureType": "road",
+        "elementType": "all",
+        "stylers": [
+            {
+                "saturation": -100
+            },
+            {
+                "lightness": 45
+            }
+        ]
+    },
+    {
+        "featureType": "road",
+        "elementType": "geometry",
+        "stylers": [
+            {
+                "visibility": "on"
+            },
+            {
+                "saturation": "0"
+            },
+            {
+                "lightness": "-9"
+            }
+        ]
+    },
+    {
+        "featureType": "road",
+        "elementType": "geometry.stroke",
+        "stylers": [
+            {
+                "lightness": "-14"
+            }
+        ]
+    },
+    {
+        "featureType": "road",
+        "elementType": "labels",
+        "stylers": [
+            {
+                "lightness": "-35"
+            },
+            {
+                "gamma": "1"
+            },
+            {
+                "weight": "1.39"
+            }
+        ]
+    },
+    {
+        "featureType": "road",
+        "elementType": "labels.text.fill",
+        "stylers": [
+            {
+                "lightness": "-19"
+            }
+        ]
+    },
+    {
+        "featureType": "road",
+        "elementType": "labels.text.stroke",
+        "stylers": [
+            {
+                "lightness": "46"
+            }
+        ]
+    },
+    {
+        "featureType": "road.highway",
+        "elementType": "all",
+        "stylers": [
+            {
+                "visibility": "simplified"
+            }
+        ]
+    },
+    {
+        "featureType": "road.highway",
+        "elementType": "labels.icon",
+        "stylers": [
+            {
+                "lightness": "-13"
+            },
+            {
+                "weight": "1.23"
+            },
+            {
+                "invert_lightness": true
+            },
+            {
+                "visibility": "simplified"
+            },
+            {
+                "hue": "#ff0000"
+            }
+        ]
+    },
+    {
+        "featureType": "road.arterial",
+        "elementType": "labels.icon",
+        "stylers": [
+            {
+                "visibility": "off"
+            }
+        ]
+    },
+    {
+        "featureType": "transit",
+        "elementType": "all",
+        "stylers": [
+            {
+                "visibility": "off"
+            }
+        ]
+    },
+    {
+        "featureType": "water",
+        "elementType": "all",
+        "stylers": [
+            {
+                "color": "#adadad"
+            },
+            {
+                "visibility": "on"
+            }
+        ]
+    }
+];
+			//MAIN MAP FUNCTION WITH LISTENERS
+			function initialize() {
+				var styledMap = new google.maps.StyledMapType(styles, {name:"Grey"});
+				//set up map center, zoom level, and base map layers
+				var mapOptions = {
+					center: aleppo,
+					zoom: 12,
+					zoomControl: true,
+					scaleControl: true,
+					mapTypeControlOptions:{
+						mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.SATELLITE, "Grey"]
+					},
+					mapTypeId: "Grey" <!-- set styledMap as the default map type-->
+				};
+				map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+				map.mapTypes.set("Grey", styledMap);
+				//Define bounding box for Aleppo
+				var aleppoBounds = new google.maps.LatLngBounds(
+						new google.maps.LatLng(36.001758, 36.841949), //LL
+						new google.maps.LatLng(36.390151, 37.463891) //UR
+						);
+				//Add listener to detect panning outside of study area bounds
+				google.maps.event.addListener(map, 'bounds_changed', function() {
+						if (aleppoBounds.contains(map.getCenter())) return;
+							else {
+								map.setCenter(aleppo);
+								map.setZoom(12);
+								alert('You are panning outside of the extent of this map. Map will re-center on Aleppo.');
+							}
+						});
+				//Add listener to detect zooming in beyond heat map visibility
+				google.maps.event.addListener(map, 'zoom_changed', function() {
+						if (map.getZoom() >15) {
+						alert('Heatmap is not available at this zoom level. Please explore further by toggling the damage site layers.')
+					};
+				});
+			}
+			//INTERACTION FUNCTIONS
+			//Clear current layer
+			function clearLayers(){
+				if (currentLyr != null){	
+					currentLyr.setMap(null);
+				}
+			}
+			//Set up functions to clear each individual layer
+			function clearHeatMaps() {
+				heatmap2016.setMap(null);
+				heatmap2015.setMap(null);
+				heatmap2014.setMap(null);
+			};
+			function clearDamageSites() {
+				damageSites2016.setMap(null);
+				damageSites2015.setMap(null);
+				damageSites2014.setMap(null);
+			};
+			function clearNeighborhoods(){
+				neighborhoodLayer.setMap(null);
+			};
+			function clearPercentDamaged(){
+				prcntDamage2015Layer.setMap(null);
+				prcntDamage2016Layer.setMap(null);
+			};
+			//Clear all layers
+			function clearAll() {
+				clearHeatMaps();
+				clearLayers();
+				clearDamageSites();
+				clearNeighborhoods();
+				clearPercentDamaged();
+				markersArray.pop().setMap(null);
+			};
+			//Toggle neighborhood boundaries
+			function toggleNeighborhoods(){
+				neighborhoodLayer.setMap(neighborhoodLayer.getMap()? null : map);
+			};
+			//set up custom icons: link to % damage lengend .pngs
+			var legend2015 = 'https://sites.google.com/site/aleppoheatmap/legends/prcntdamaged2015.png';
+			var legend2016 = 'https://sites.google.com/site/aleppoheatmap/legends/prcntdamaged2016.png';
+			var legendPosition = new google.maps.LatLng(36.102509, 37.150579);
+			//Toggle 2015 % damage
+			function prcntDamage2015Toggle(){
+				clearLayers();
+				if (prcntDamage2015Layer.getMap() ==null){
+					prcntDamage2015Layer.setMap(map);
+					//add legend as icon image at marker
+							while(markersArray.length) {markersArray.pop().setMap(null);}
+								var marker = new google.maps.Marker({
+									position: legendPosition,
+									icon: legend2015,
+									map:map
+									});
+									markersArray.push(marker);
+				}else{
+					prcntDamage2015Layer.setMap(null);
+					markersArray.pop().setMap(null);
+				}
+			};
+			//Toggle 2016 % damage
+			function prcntDamage2016Toggle(){
+				clearLayers();
+				if (prcntDamage2016Layer.getMap() ==null){
+					prcntDamage2016Layer.setMap(map);
+					//add legend as icon image at marker
+					while(markersArray.length) {markersArray.pop().setMap(null);}
+						var marker = new google.maps.Marker({
+							position: legendPosition,
+							icon: legend2016,
+							map:map
+							});
+							markersArray.push(marker);
+				}else{
+					prcntDamage2016Layer.setMap(null);
+					markersArray.pop().setMap(null);
+				}
+			};
+			//Toggle heat maps by year
+			function toggleHeatmap2016(){
+				clearLayers();
+					if (heatmap2016.getMap() ==null){
+					heatmap2016.setMap(map); 
+						}else{
+					heatmap2016.setMap(null);
+				}
+			};
+			function toggleHeatmap2015(){
+				clearLayers();
+					if (heatmap2015.getMap() ==null){
+					heatmap2015.setMap(map);
+						}else{
+					heatmap2015.setMap(null);
+				}
+			};
+			function toggleHeatmap2014(){
+				clearLayers();
+					if (heatmap2014.getMap() ==null){
+					heatmap2014.setMap(map); 
+						}else{
+					heatmap2014.setMap(null);
+				}
+			};
+			//Toggle damage site points by year
+			function toggleDamageSites2016(){
+				clearLayers();
+				if (damageSites2016.getMap() ==null){
+					damageSites2016.setMap(map);
+				}else{
+					damageSites2016.setMap(null);
+				}
+			};
+			function toggleDamageSites2015(){
+				clearLayers();
+				if (damageSites2015.getMap() ==null){
+					damageSites2015.setMap(map);
+				}else{
+					damageSites2015.setMap(null);
+				}
+			};
+			function toggleDamageSites2014(){
+				clearLayers();
+				if (damageSites2014.getMap() ==null){
+					damageSites2014.setMap(map);
+				}else{
+					damageSites2014.setMap(null);
+				}
+			};
+			//Reset map to original view
+			function toggleReset() {
+				map.setCenter(aleppo);
+				map.setZoom(12);
+				clearAll()
+			}
+		</script>
+
+		<!--Reference ZingCharts-->
+
+		<script type = "text/javascript" src= "https://cdn.zingchart.com/zingchart.min.js">zingchart.MODULESDIR = "https://cdn.zingchart.com/modules/";
+		ZC.LICENSE = ["569d52cefae586f634c54f86dc99e6a9","ee6b7db5b51705a13dc2339db3edaf6d"];</script>
+
+		<script type = "text/javascript">
+			function data_vis() {
+				zingchart.THEME="classic";
+				var myConfig = {
+					"background-color": "#000000",
+					"graphset": [
+						{
+							"type": "mixed",
+							"width": "60%",
+							"background-color": "#000000",
+							"title": {
+								"y": "10px",
+								"text-align": "center",
+								"background-color": "none",
+								"text": "Affected Populations from Syria",
+								"font-weight": "bold",
+								"font-family": "Arial",
+								"font-color": "#ffffff",
+								"font-size": "18px",
+								"height": "5%",
+								"padding-left": "20px"
+							},
+							"plotarea": {
+								"margin": "75px 75px 5px 67px"
+							},
+							"scale-x": {
+								"values": [
+									"2011",
+									"2012",
+									"2013",
+									"2014",
+								],
+								"flat": false,
+								"line-color": "#55717c",
+								"offset-y": "4px",
+								"guide": {
+									"visible": false
+								},
+								"label": {
+									"font-size": "11px",
+									"font-family": "Arial",
+									"font-color": "#ffffff",
+									"font-weight": "normal"
+								},
+								"item": {
+									"tooltip": {
+										"text": "%months"
+									},
+									"font-size": "10px",
+									"font-family": "Arial",
+									"font-color": "#c0c0c0"
+								},
+								"tick": {
+									"visible": false
+								}
+							},
+							"scale-y": {
+								"line-color": "none",
+								"values": "0:12000000:250000",
+								"multiplier": true,
+								"label": {
+									"text": "Number of Affected Persons",
+									"font-size": "11px",
+									"font-family": "Arial",
+									"font-color": "#ffffff",
+									"font-weight": "normal"
+								},
+								"item": {
+									"font-size": "10px",
+									"font-family": "Arial",
+									"font-color": "#c0c0c0"
+								},
+								"guide": {
+									"line-style": "solid",
+									"line-color": "#5e606c",
+									"alpha": 1
+								},
+								"tick": {
+									"visible": false
+								}
+							},
+							"scale-y-2": {
+								"line-color": "none",
+								"values": "0:10000:2000",
+								"multiplier": true,
+								"label": {
+									"text": "Number of Affected Persons Resettled",
+									"offset-x": "5px",
+									"font-size": "11px",
+									"font-family": "Arial",
+									"font-color": "#ffffff",
+									"font-weight": "normal"
+								},
+								"item": {
+									"font-size": "10px",
+									"font-family": "Arial",
+									"font-color": "#c0c0c0"
+								},
+								"guide": {
+									"visible": false
+								},
+								"tick": {
+									"visible": false
+								}
+							},
+							"plot": {},
+							"series": [
+								{
+									"values": [
+										279497,
+										9340330,
+										11606449,
+										11690236,
+									],
+									"type": "bar",
+									"background-color": "#6597a2",
+									"hover-state": {
+										"visible": 0
+									},
+									"tooltip": {
+										"background-color": "#2f6672",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									},
+									"animation": {
+										"delay": 0,
+										"effect": 4,
+										"speed": "1000",
+										"method": "0",
+										"sequence": "0"
+									}
+								},
+								{
+									"values": [
+										110,
+										197,
+										614,
+										6362,
+									],
+									"type": "line",
+									"line-color": "#96feff",
+									"line-width": 2,
+									"marker": {
+										"background-color": "#a3bcb8",
+										"border-width": 2,
+										"shadow": 0,
+										"border-color": "#88f5fa"
+									},
+									"tooltip": {
+										"background-color": "#54ced4",
+										"font-color": "#454754",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									},
+									"animation": {
+										"delay": 500,
+										"effect": 5,
+										"speed": "1800",
+										"method": "0",
+										"sequence": "1"
+									},
+									"scales": "scale-x,scale-y-2"
+								}
+							]
+						},
+						{
+							"type": "pie",
+							"width": "34%",
+							"x": "61.5%",
+							"y": "3%",
+							"background-color": "#000000",
+							"title": {
+								"text-align": "center",
+								"background-color": "none",
+								"font-weight": "bold",
+								"font-family": "Arial",
+								"font-color": "#ffffff",
+								"font-size": "18px",
+								"height": "30%",
+								"text": "Types of Affected Groups"
+							},
+							"plotarea": {
+								"margin": "10px 10px 0px 0px"
+							},
+							"plot": {
+								"value-box": {
+									"visible": false
+								},
+								"animation": {
+									"delay": 0,
+									"effect": 2,
+									"speed": "300",
+									"method": "0",
+									"sequence": "1"
+								}
+							},
+							"series": [
+								{
+									"values": [
+										34.17
+									],
+									"background-color": "#57dce5",
+									"border-width": "0px",
+									"shadow": 0,
+									"tooltip": {
+										"text": "Refugees 34.17%",
+										"background-color": "#54ced4",
+										"font-color": "#454754",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									}
+								},
+								{
+									"values": [
+										1.17
+									],
+									"background-color": "#9688f7",
+									"border-width": "0px",
+									"shadow": 0,
+									"tooltip": {
+										"text": "Asylum-Seekers 1.17%",
+										"background-color": "#796bdd",
+										"font-color": "#ffffff",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									}
+								},
+								{
+									"values": [
+										0.43
+									],
+									"background-color": "#b659b4",
+									"border-width": "0px",
+									"shadow": 0,
+									"tooltip": {
+										"text": "Returned Refugees 0.43%",
+										"background-color": "#a03f9c",
+										"font-color": "#ffffff",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									}
+								},
+								{
+									"values": [
+										62.94
+									],
+									"background-color": "#3bbcfc",
+									"border-width": "0px",
+									"shadow": 0,
+									"tooltip": {
+										"text": "Internally Displaced Persons 62.94%",
+										"background-color": "#1b9ede",
+										"font-color": "#ffffff",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									}
+								},
+								{
+									"values": [
+										1.19
+									],
+									"background-color": "#6597a2",
+									"border-width": "0px",
+									"shadow": 0,
+									"tooltip": {
+										"text": "Stateless Persons 1.19%",
+										"background-color": "#2f6672",
+										"font-color": "#ffffff",
+										"border-radius": "6px",
+										"shadow": false,
+										"padding": "5px 10px"
+									}
+								},
+								{
+									"values": [
+										0.10
+									],
+									"background-color": "#6597a2",
+									"border-width": "0px",
+									"shadow": 0,
+									"tooltip": {
+										"text": "Other Persons of Concern 0.1%",
+										"background-color": "#2f6672",
+										"font-color": "#ffffff",
+										"border-radius": "6px",
+										"shadow": false
+	 								}
+								}
+							]
+						},
+						{
+							"type": "bar",
+								"width": "100%",
+								"background-color": "#000000",
+								"border-bottom": "8px solid #000000",
+								"plot": {
+									"value-box": {
+										"placement": "top-out",
+										"text":"%plot-percent%",
+ 	    								"decimals":2
+									},
+									"bar-space": "10px",
+									"animation": {
+										"delay": 0,
+										"effect": 4,
+										"speed": "1000",
+										"method": "0",
+										"sequence": "0"
+									}
+								},
+								"title": {
+									"text-align": "left",
+									"offset-x": "20px",
+									"offset-y": "10px",
+									"background-color": "#000000",
+									"margin": "5%",
+									"padding": "5%",
+									"font-weight": "bold",
+									"font-size": "18px",
+									"font-family": "Arial",
+									"font-color": "#ffffff",
+									"height": "5%",
+									"text": "Demographic Affected"
+								},
+								"legend":{
+									"layout":"1x3",
+										"x":"61.5%",
+										"y":"7%",
+										"background-color": "none"
+  								},
+								"plotarea": {
+									"margin": "45px 30px 40px 65px"
+								},
+								"scale-x": {
+									"values": [
+										2011,
+										2012,
+										2013,
+										2014,
+										2015,
+									],
+									"line-color": "#55717c",
+									"offset-y": "4px",
+									"tick": {
+										"size": "5px",
+										"line-color": "#55717c",
+										"line-width": "1px",
+										"visible": false
+									},
+									"guide": {
+										"visible": false
+									},
+									"item": {
+										"font-size": "10px",
+										"font-family": "Arial",
+										"font-color": "#c0c0c0"
+									}
+								},
+								"scale-y": {
+									"line-color": "none",
+									"values": "0:1700000:100000",
+									"multiplier": true,
+									"guide": {
+										"line-style": "solid",
+										"line-color": "#5e606c",
+										"alpha": 1
+									},
+									"tick": {
+										"visible": false
+									},
+									"label": {
+										"text": "Number of People",
+										"offset-x": "-5px",
+										"font-size": "11px",
+										"font-family": "Arial",
+										"font-color": "#ffffff",
+										"font-weight": "normal"
+									},
+									"item": {
+										"padding-left": "2px",
+										"font-size": "10px",
+										"font-family": "Arial",
+										"font-color": "#c0c0c0"
+									}
+								},
+								"series": [
+									{
+										"values": [
+											273714,
+											839929,
+											1655540,
+											1351762,
+											1246326
+										],
+										"legend-text": "Children",
+										"background-color": "#57dde8",
+										"tooltip": {
+											"background-color": "#54ced4",
+											"font-color": "#454754",
+											"border-radius": "6px",
+											"shadow": false,
+											"padding": "5px 10px"
+										}
+									},
+									{
+										"values": [
+											173228,
+											391912,
+											724475,
+											618363,
+											666116
+										],
+										"legend-text": "Women",
+										"background-color": "#978af6",
+										"tooltip": {
+											"background-color": "#796bdd",
+											"font-color": "#ffffff",
+											"border-radius": "6px",
+											"shadow": false,
+											"padding": "5px 10px"
+										}
+									},
+									{
+										"values": [
+											182377,
+											487954,
+											785569,
+											578684,
+											680155
+										],
+										"legend-text": "Men",
+										"background-color": "#b857b4",
+										"tooltip": {
+											"background-color": "#a03f9c",
+											"font-color": "#ffffff",
+											"border-radius": "6px",
+											"shadow": false,
+											"padding": "5px 10px"
+										}
+									}
+								]
+							}
+						]
+					};
+									zingchart.render({
+										id : 'myChart',
+										data : myConfig,
+										height: 950,
+										width: 790
+									});
+								}
+		</script>
+
+	</head>
+
+	<!-- Call functions when page body has loaded-->
+	<body onload = "initialize(), data_vis()">
+
+		<div id="project_info" align="left">
+			<center><img src="https://i.guim.co.uk/img/media/da1549de1af478bb0b361af1a5d3563a7fabae6f/0_0_3500_2334/master/3500.jpg?w=300&q=55&auto=format&usm=12&fit=max&s=c32448ec9a7a525dcf1a77a4c3f573f4"><br>
+			<font family = 'Calibri' size = 4 color = '#4d4d4d'><b>Devastation in Aleppo</b></font><p>
+			<font family = 'Calibri' size = 3 color = '#4d4d4d'>Aleppo, Syria - one of the world's oldest inhabited cities- was added to the UNESCO World Heritage List in 1986. Now, after years of violent, bloody civil war, many of its ancient buildings have been completely destroyed with tens of thousands of its residents killed or dispalced. This map shows damage in Aleppo from 2014-2016.
+			<i><p>Data Source: UNITAR & UNHCR </i></font>
+				</p></center></div>
+
+		<div id = "toggle_layers">
+			<b> Toggle Layers:</b><br>
+			<input id = "button1" type = "button" onclick = "toggleNeighborhoods()" value = "Neighborhoods"/>
+			<input id = "button1" type = "button" onclick = "prcntDamage2015Toggle()" value = "Percent Damaged: 2015"/>
+			<input id = "button1" type = "button" onclick = "prcntDamage2016Toggle()" value = "Percent Damaged: 2016"/>
+			<br><input id = "button1" type = "button" onclick = "toggleReset()" value = "Reset"/>
+		</div>
+
+		<div id = "toggle_heatmap">
+			<b> Damage Heatmaps</b><br>
+			<input id = "button1" type = "button" onclick = "toggleHeatmap2014()" value = "2014"/>
+			<input id = "button1" type = "button" onclick = "toggleHeatmap2015()" value = "2015"/>
+			<input id = "button1" type = "button" onclick = "toggleHeatmap2016()" value = "2016"/>
+		</div>
+
+		<div id='myChart'><a class="zc-ref" href="https://www.zingchart.com/">Powered by ZingChart</a></div>
+
+		<div id = "toggle_damagesites">
+			<b> Damage Sites</b><br>
+			<input id = "button1" type = "button" onclick = "toggleDamageSites2014()" value = "2014"/>
+			<input id = "button1" type = "button" onclick = "toggleDamageSites2015()" value = "2015"/>
+			<input id = "button1" type = "button" onclick = "toggleDamageSites2016()" value = "2016"/>
+		</div>
+
+		<div id = "info_window"></div>
+
+		<div id="map_canvas" ></div>
+
+	</body>
+</html>
